@@ -2,54 +2,118 @@ var Splitter = artifacts.require("./Splitter.sol");
 
 contract('Splitter', function(accounts) {
 
-  var contract;
+  var contract;  
 
-  var alice = accounts[0];
-  var bob   = accounts[1];
-  var carol = accounts[2];
+  var owner = accounts[0];
+  var testAccount1 = accounts[1];
+  var testAccount2 = accounts[2];
 
   beforeEach(function() {
-    return Splitter.new(alice, bob, carol)
+    return Splitter.new()
       .then(function(instance) {
-        contract = instance;
+        contract = instance;        
       });
   });
 
-  it("should start with no balance", function() {
 
-    return Splitter.deployed().then(function(instance) {
-      return instance.getContractBalance.call();
-    }).then(function(balance) {
-      assert.equal(balance.valueOf(), 0, "contract was not empty in its instantiation");
-    });
+  it("should split between receivers", function() {
+
+    var funds = 4;
+    var receivers = [testAccount1, testAccount2];
+    var expectedFunds = funds / receivers.length;
+
+    return contract.getAvailableFunds.call({from: testAccount1})
+    .then(fundsAcc1 => {
+      assert.equal(0, fundsAcc1, "test account 1 already had available funds");
+      return contract.getAvailableFunds.call({from: testAccount2})
+    })
+    .then(fundsAcc2 => {
+      assert.equal(0, fundsAcc2, "test account 2 already had available funds");
+      return contract.credit(receivers, {from: owner, value: funds})
+    })    
+    .then(result => contract.getAvailableFunds.call({from: testAccount1}))
+    .then(newFundsAcc1 => {
+      assert.equal(expectedFunds, newFundsAcc1, "test account 1 did not receive the expected funds");
+      return contract.getAvailableFunds.call({from: testAccount2});
+    })
+    .then(newFundsAcc2 => assert.equal(expectedFunds, newFundsAcc2, "test account 2 did not receive the expected funds"));
   });
 
-  it("should split evenly between Bob and Carol and send remaining to contract when transfered from Alice", function() {
 
-    var aliceTransfer = 2;
-    var expectedBobFunds = aliceTransfer / 2;
-    var expectedCarolFunds = aliceTransfer / 2;
-    var expectedContractFunds = aliceTransfer % 2;
+  it("should credit remainder back to sender", function() {
 
-    return Splitter.deployed()
-    .then(function(instance) {      
-      return instance.split({from: alice, value: 1});
+    var funds = 5;
+    var receivers = [testAccount1, testAccount2];
+    var ownerExpectedFunds = funds % receivers.length;
+
+    return contract.getAvailableFunds.call({from: owner})
+    .then(fundsOwner => {
+      assert.equal(0, fundsOwner, "sender already had available funds");
+      return contract.credit(receivers, {from: owner, value: funds})
+    })   
+    .then(result => contract.getAvailableFunds.call({from: owner}))
+    .then(newFundsOwner => assert.equal(ownerExpectedFunds, newFundsOwner, "sender did not receive the expected funds"));
+  });
+
+
+  it("should allow funds claiming", function() {
+
+    var funds = 5;
+    var receivers = [testAccount1];    
+
+    return contract.getAvailableFunds.call({from: testAccount1})
+    .then(accFunds => {
+      assert.equal(0, accFunds, "account already had available funds");
+      return contract.credit(receivers, {from: owner, value: funds})
+    })   
+    .then(result => contract.getAvailableFunds.call({from: testAccount1}))
+    .then(newFunds => {
+      assert.equal(funds, newFunds, "account did not receive the expected funds");
+      return contract.claim({from: testAccount1});
     })
-    .then(function(result) {
-      console.log(result);
-      assert.isTrue(result, "Alice transfered value was not processed");
-      return web3.eth.getBalance(bob);
+    .then(res => contract.claim.call({from: testAccount1}))
+    .then(res2 => assert.isFalse(res2, "account could claim the funds twice"));    
+
+  });
+
+
+  it("should forbid splits if contract is finished", function() {
+
+    var funds = 4;
+    var receivers = [testAccount1, testAccount2];
+    var expectedFunds = funds / receivers.length;
+
+    return contract.killed.call()
+    .then(finished => {
+      assert.isFalse(finished, "contract was finished from the beginning");
+      //return contract.credit(receivers, {from: owner, value: funds});
+    })  
+    .then(cr => contract.finishContract({from: owner}))    
+    .then(fc => contract.killed.call())
+    .then(finishedNow => {
+      assert.isTrue(finishedNow, "contract did not finish after command");
+      return contract.credit.call(receivers, {from: owner, value: funds});
     })
-    .then(function(bobFunds) {
-      assert.strictEqual(bobFunds, expectedBobFunds, "Incorrect Bob resulting funds after Alice transaction");
-      return web3.eth.getBalance(carol);
+    .catch(err => assert.isTrue((err+"").indexOf("Error: Error: VM Exception while executing eth_call: invalid opcode") !== -1, "contract received split request after killed"));    
+  });
+
+
+  it("should funds claiming after contract is finished", function() {
+
+    var funds = 5;
+    var receivers = [testAccount1];    
+
+    return contract.getAvailableFunds.call({from: testAccount1})
+    .then(accFunds => {
+      assert.equal(0, accFunds, "account already had available funds");
+      return contract.credit(receivers, {from: owner, value: funds})
+    })   
+    .then(result => contract.finishContract())
+    .then(finished => contract.getAvailableFunds.call({from: testAccount1}))
+    .then(newFunds => {
+      assert.equal(funds, newFunds, "account did not receive the funds");
+      return contract.claim.call({from: testAccount1});
     })
-    .then(function(carolFunds) {
-      assert.strictEqual(carolFunds, expectedCarolFunds, "Incorrect Carol resulting funds after Alice transaction");
-      return instance.getContractBalance.call();
-    })
-    .then(function(contractFunds) {
-      assert.strictEqual(contractFunds, expectedContractFunds, "Incorrect remaining contract funds after Alice transaction");
-    })
-  })
+    .then(res => assert.isTrue(res, "account could not claim funds"));
+  });
 });
