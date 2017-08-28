@@ -58,9 +58,10 @@ contract('ServiceProvider', function(accounts) {
     .then(res1 => exchange.addSymbols(currencies, commissions, rates))
     .then(res2 => exchange.authorizeUser(testAccount1, weakPass, strongPass))
     .then(res3 => provider.authorizeUser(testAccount1, weakPass, strongPass))
-    .then(res4 => provider.remit(testAccount1, funds, currencies[index], exchange.address, {from: testAccount2, value: funds}))
+    .then(res4 => provider.remit(testAccount1, currencies[index], exchange.address, {from: testAccount2, value: funds}))
     .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "user that is not the owner could remit funds"));    
   });
+
 
   it("should forbid remittance if unknwon currency", function() {
 
@@ -75,8 +76,8 @@ contract('ServiceProvider', function(accounts) {
     .then(res => exchange.addSymbols(currencies, commissions, rates))
     .then(res2 => exchange.authorizeUser(testAccount1, weakPass, strongPass))
     .then(res3 => provider.authorizeUser(testAccount1, weakPass, strongPass))
-    .then(res4 => provider.remit(testAccount1, funds, "UNK", exchange.address, {value: funds}))
-    .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "user that is not the owner could remit funds")); 
+    .then(res4 => provider.remit(testAccount1, "UNK", exchange.address, {value: funds}))
+    .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "transaction performed with unknown currency")); 
   });
 
 
@@ -93,8 +94,8 @@ contract('ServiceProvider', function(accounts) {
     .then(res => exchange.addSymbols(currencies, commissions, rates))
     .then(res2 => exchange.authorizeUser(testAccount1, weakPass, strongPass))
     .then(res3 => provider.authorizeUser(testAccount1, weakPass+"1", strongPass+"1"))
-    .then(res4 => provider.remit.call(testAccount1, funds, currencies[index], exchange.address, {value: funds}))
-    .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "user that is not the owner could remit funds")); 
+    .then(res4 => provider.remit(testAccount1, currencies[index], exchange.address, {value: funds}))    
+    .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "transaction accomplished with non matching passwords")); 
   }); 
 
 
@@ -111,7 +112,7 @@ contract('ServiceProvider', function(accounts) {
     .then(res => exchange.addSymbols(currencies, commissions, rates))
     .then(res2 => exchange.authorizeUser(testAccount1, weakPass, strongPass))
     .then(res3 => provider.authorizeUser(testAccount1, weakPass, strongPass))
-    .then(res4 => provider.remit(testAccount1, funds, currencies[index], exchange.address, {value: funds}))
-    .then(sent => assert.equal(remitValue - commissions[index], sent), "remittance failed");
+    .then(res4 => provider.remit(testAccount1, currencies[index], exchange.address, {value: funds}))        
+    .then(sent => assert.isTrue(JSON.stringify(sent).indexOf("transactionHash") !== -1, "intentional"));    
   });    
 });

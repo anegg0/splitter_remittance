@@ -39,7 +39,7 @@ contract ServiceProvider {
         require(exchanges[exchange] != Exchange(0x0));
         _;
     }
-    
+
     function authorizeUser(address user, bytes32 weakPassword, bytes32 strongPassword)
     onlyByOwner()
     external
@@ -61,7 +61,7 @@ contract ServiceProvider {
     function remit(address customer, bytes32 currency, address exchangeAddress)
     payable 
     onlyByOwner()
-    exchangeIsTrusted(exchange)
+    exchangeIsTrusted(exchangeAddress)
     external
     returns(uint) {
         
@@ -70,7 +70,7 @@ contract ServiceProvider {
         var(retrievedWeakPassword, retrievedStrongPassword) = exchange.authenticateExchange(customer);
 
         Authorization storage localAuthorization = usersPasswords[customer];
-        
+
         require(localAuthorization.weakPassword == retrievedWeakPassword && localAuthorization.strongPassword == retrievedStrongPassword);
         
         return exchanges[exchange].convertAndTransfer.value(msg.value)(customer, currency);
