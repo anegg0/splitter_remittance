@@ -38,6 +38,11 @@ contract Exchange {
         _;
     }
 
+    modifier hasEnoughFunds(uint value) {
+        require(this.balance <= value);
+        _;
+    }
+
     function updateCommission(uint newCommission)
     external
     returns(bool)
@@ -78,5 +83,15 @@ contract Exchange {
         Transfer(msg.sender, user, totalValue, currency);
 
         return (totalValue);
+    }
+
+    function withdraw()
+    onlyByOwner()
+    hasEnoughFunds(msg.value)
+    external
+    returns(bool)
+    {
+        owner.transfer(msg.value);
+        return true;
     }
 }
