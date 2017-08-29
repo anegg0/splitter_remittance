@@ -18,9 +18,8 @@ contract('Splitter', function(accounts) {
 
   it("should split between receivers", function() {
 
-    var funds = 4;
-    var receivers = [testAccount1, testAccount2];
-    var expectedFunds = funds / receivers.length;
+    var funds = 4;    
+    var expectedFunds = funds / 2;
 
     return contract.getAvailableFunds.call({from: testAccount1})
     .then(fundsAcc1 => {
@@ -29,7 +28,7 @@ contract('Splitter', function(accounts) {
     })
     .then(fundsAcc2 => {
       assert.equal(0, fundsAcc2, "test account 2 already had available funds");
-      return contract.credit(receivers, {from: owner, value: funds})
+      return contract.credit(testAccount1, testAccount2, {from: owner, value: funds})
     })    
     .then(result => contract.getAvailableFunds.call({from: testAccount1}))
     .then(newFundsAcc1 => {
@@ -42,14 +41,13 @@ contract('Splitter', function(accounts) {
 
   it("should credit remainder back to sender", function() {
 
-    var funds = 5;
-    var receivers = [testAccount1, testAccount2];
-    var ownerExpectedFunds = funds % receivers.length;
+    var funds = 5; 
+    var ownerExpectedFunds = funds % 2;
 
     return contract.getAvailableFunds.call({from: owner})
     .then(fundsOwner => {
       assert.equal(0, fundsOwner, "sender already had available funds");
-      return contract.credit(receivers, {from: owner, value: funds})
+      return contract.credit(testAccount1, testAccount2, {from: owner, value: funds})
     })   
     .then(result => contract.getAvailableFunds.call({from: owner}))
     .then(newFundsOwner => assert.equal(ownerExpectedFunds, newFundsOwner, "sender did not receive the expected funds"));
@@ -58,17 +56,17 @@ contract('Splitter', function(accounts) {
 
   it("should allow funds claiming", function() {
 
-    var funds = 5;
-    var receivers = [testAccount1];    
+    var funds = 5;  
+    var expectedFunds = 4;
 
     return contract.getAvailableFunds.call({from: testAccount1})
     .then(accFunds => {
       assert.equal(0, accFunds, "account already had available funds");
-      return contract.credit(receivers, {from: owner, value: funds})
+      return contract.credit(testAccount1, testAccount1, {from: owner, value: funds})
     })   
     .then(result => contract.getAvailableFunds.call({from: testAccount1}))
     .then(newFunds => {
-      assert.equal(funds, newFunds, "account did not receive the expected funds");
+      assert.equal(expectedFunds, newFunds.toNumber(), "account did not receive the expected funds");
       return contract.claim({from: testAccount1});
     })
     .then(res => contract.claim.call({from: testAccount1}))
@@ -79,9 +77,8 @@ contract('Splitter', function(accounts) {
 
   it("should forbid splits if contract is finished", function() {
 
-    var funds = 4;
-    var receivers = [testAccount1, testAccount2];
-    var expectedFunds = funds / receivers.length;
+    var funds = 4;    
+    var expectedFunds = funds / 2;
 
     return contract.killed.call()
     .then(finished => {
@@ -92,7 +89,7 @@ contract('Splitter', function(accounts) {
     .then(fc => contract.killed.call())
     .then(finishedNow => {
       assert.isTrue(finishedNow, "contract did not finish after command");
-      return contract.credit.call(receivers, {from: owner, value: funds});
+      return contract.credit.call(testAccount1,testAccount2, {from: owner, value: funds});
     })
     .catch(err => assert.isTrue((err+"").indexOf("Error: Error: VM Exception while executing eth_call: invalid opcode") !== -1, "contract received split request after killed"));    
   });
@@ -101,17 +98,17 @@ contract('Splitter', function(accounts) {
   it("should funds claiming after contract is finished", function() {
 
     var funds = 5;
-    var receivers = [testAccount1];    
+    var expectedFunds = 4;    
 
     return contract.getAvailableFunds.call({from: testAccount1})
     .then(accFunds => {
       assert.equal(0, accFunds, "account already had available funds");
-      return contract.credit(receivers, {from: owner, value: funds})
+      return contract.credit(testAccount1, testAccount1, {from: owner, value: funds})
     })   
     .then(result => contract.finishContract())
     .then(finished => contract.getAvailableFunds.call({from: testAccount1}))
     .then(newFunds => {
-      assert.equal(funds, newFunds, "account did not receive the funds");
+      assert.equal(expectedFunds, newFunds, "account did not receive the funds");
       return contract.claim.call({from: testAccount1});
     })
     .then(res => assert.isTrue(res, "account could not claim funds"));

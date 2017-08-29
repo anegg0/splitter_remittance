@@ -35,14 +35,6 @@ contract Splitter {
         require(killed == false);
         _;
     }     
-    
-    function getContractFunds() 
-    constant
-    external
-    returns(uint)
-    {
-        return this.balance;
-    }
 
     // Retrieves the funds available for a given user
     function getAvailableFunds() 
@@ -52,28 +44,25 @@ contract Splitter {
         return usersBalances[msg.sender];
     }
 
-    // Allows a user to send funds to be split
-    // The funds are spread among the receivers, remaining funds
-    // are returned to the sender
-    function credit(address[] receivers)
+    // Splits funds between two receivers
+    function credit(address receiver1, address receiver2)
     payable
     isNotKilled()
-    hasEnoughFunds(msg.value, receivers.length)
+    hasEnoughFunds(msg.value, 2)
     external
-    returns(bool) {
+    returns(bool) 
+    {        
+        uint share = msg.value / 2;
+        uint remaining = msg.value % 2;
 
-        uint numReceivers = receivers.length;
-
-        uint share = msg.value / numReceivers;
-        uint remaining = msg.value % numReceivers;
-
-        for (uint i = 0 ; i < numReceivers ; i++) {
-            usersBalances[receivers[i]] += share;
-        }
+        usersBalances[receiver1] += share;
+        usersBalances[receiver2] += share;
 
         if (remaining > 0) {
             usersBalances[msg.sender] += remaining;
         }
+
+        return true;
     }
 
     // Allows a user to claim her funds, if there are any

@@ -8,67 +8,42 @@ pragma solidity ^0.4.10;
  */ 
 contract Exchange {
     
-    struct FX {
-        uint commission;
-        uint rate;
-    }
-    
+    event Transfer(address indexed sender, address indexed receiver, uint indexed amount, bytes32 currency);
+
     // the weak password came from an e-mail message
     // the strong password was delivered in person
     // both passwords are expected to BE ENCODED by the sender
     struct Authorization {
         bytes32 weakPassword;
         bytes32 strongPassword;
-    }
+    }    
     
+    mapping(address => Authorization) usersPasswords;        
+
     address private owner;
-    
-    mapping(address => Authorization) usersPasswords;    
-    
-    mapping(bytes32 => FX) fxs;
-    
+    uint    public  commission;
+
+    function Exchange(uint _commission) {        
+        owner = msg.sender;
+        commission = _commission;
+    }
+
     modifier onlyByOwner() {
         require(msg.sender == owner);
         _;
     }
-    
-    function Exchange() {        
-        owner = msg.sender;
-    }
 
-    modifier dealsWithSymbol(bytes32 symbol) {
-        require(fxs[symbol].commission != 0);
+    modifier sentEnoughBalance(uint value) {
+        require(commission < value);
         _;
     }
 
-    modifier sentEnoughBalance(bytes32 symbol, uint value) {
-        require(fxs[symbol].commission < value);
-        _;
-    }
-
-    function addSymbols(bytes32[] symbols, uint[] commissions, uint[] rates)
-    onlyByOwner()
+    function updateCommission(uint newCommission)
     external
-    returns(bool) 
+    returns(bool)
     {
-        require(symbols.length == commissions.length);
-        require(symbols.length == rates.length);
-                
-        uint numSymbols = symbols.length;
-
-        for (uint i = 0 ; i < numSymbols ; i++) {
-            fxs[symbols[i]] = FX(commissions[i], rates[i]);
-        }
-
+        commission = newCommission;
         return true;
-    }
-
-    function getSymbolRate(bytes32 symbol)
-    constant
-    external
-    returns(uint)
-    {
-        return fxs[symbol].rate;
     }
 
     function authorizeUser(address user, bytes32 weakPassword, bytes32 strongPassword)
@@ -92,21 +67,16 @@ contract Exchange {
     }
     
     // Returns the value paid to the receiver.
-    function convertAndTransfer(address user, bytes32 symbol) 
+    function convertAndTransfer(address user, bytes32 currency) 
     payable 
-    dealsWithSymbol(symbol)
-    sentEnoughBalance(symbol, msg.value)
+    sentEnoughBalance(msg.value)
     external    
     returns (uint) 
     {
-        uint totalValue = msg.value - fxs[symbol].commission;
-        
-        // the rate would be applied here, however, there should be more going under the
-        // hood since a real conversion would be applied
-        //totalValue = totalValue * fxs[symbol].rate;
-        
-        user.transfer(totalValue);
-        
+        uint totalValue = msg.value - commission;
+                    
+        Transfer(msg.sender, user, totalValue, currency);
+
         return (totalValue);
     }
 }

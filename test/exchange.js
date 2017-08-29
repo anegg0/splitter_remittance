@@ -15,9 +15,7 @@ function hex2a(hexx) {
 
 contract('Exchange', function(accounts) {
 
-  var currencies = new Array("USD","GBP","BRL","EUR");
-  var commissions = new Array(1, 1, 1, 4);
-  var rates = new Array(2, 3, 4, 5);    
+  var commission = 2;  
 
   var exchange;  
 
@@ -27,20 +25,18 @@ contract('Exchange', function(accounts) {
 
   beforeEach(function() {
 
-    return Exchange.new()
+    return Exchange.new(commission)
     .then(function(exInstance) {
       exchange = exInstance;      
     });
   });
 
   
-  it("should receive symbols, commissions and rates", function() {
+  it("should update commission", function() {    
 
-    var index = 1;
-
-    return exchange.addSymbols(currencies, commissions, rates)
-    .then(ret => exchange.getSymbolRate.call(currencies[index]))
-    .then(rate => assert.equal(rates[index], rate, "incorrect rate was returned"));    
+    return exchange.updateCommission(commission + 1)
+    .then(ret => exchange.commission.call())
+    .then(setCommission => assert.equal(setCommission, commission + 1, "commission was not set"));
   });
   
 
@@ -65,36 +61,31 @@ contract('Exchange', function(accounts) {
 
 
   it("should refuse transactions if the funds are insufficient", function() {
+    
+    var invalidFunds = commission - 1;
 
-    exchange.addSymbols(currencies, commissions, rates)
-    .catch(err => console.log("Could not add symbols: "+err));
-
-    index = currencies.length - 1;    
-    var invalidFunds = commissions[index] - 1;
-
-    return exchange.convertAndTransfer(testAccount2,currencies[index],{from: testAccount1, value: invalidFunds})    
+    return exchange.convertAndTransfer(testAccount2, "BRL", {from: testAccount1, value: invalidFunds})    
     .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "could finish transaction with insufficient funds"));
   });
 
 
-  it("should refuse transactions with unknown currencies", function() {
-
-    return exchange.convertAndTransfer(testAccount2, "INX",{from: testAccount1, value: 10})    
-    .catch(err => assert.isTrue((err+"").indexOf("Error: VM Exception while processing transaction: invalid opcode") !== -1, "could process transaction with unknown funds"));
-
-  });
-
-
   it("should perform transactions", function() {
+    
+    var validFunds = commission + 1;
 
-    exchange.addSymbols(currencies, commissions, rates)
-    .catch(err => console.log("Could not add symbols: "+err));
-
-    index = currencies.length - 1;    
-    var validFunds = commissions[index] + 1;
-
-    return exchange.convertAndTransfer.call(testAccount2,currencies[index],{from: testAccount1, value: validFunds})
-    .then(ret => assert.equal(validFunds - commissions[index], ret, "did not process comissions properly"))
+    return exchange.convertAndTransfer.call(testAccount2, "BRL", {from: testAccount1, value: validFunds})
+    .then(ret => assert.equal(validFunds - commission, ret, "did not process comissions properly"))
     .catch(err => console.log("ERRR: "+err));
   });  
+
+  it("contract should retain commissions", function() {
+
+    var validFunds = commission + 1;
+
+    web3.eth.getBalance.call(exchange.address, function(err,res){console.log("CAME1: "+res)});
+
+    return exchange.convertAndTransfer(testAccount2, "BRL", {from: testAccount1, value: validFunds})    
+    .then(ret2 => web3.eth.getBalance(exchange.address, function(err,res){console.log("CAME2: "+res)}))
+    .catch(err => console.log("ERRR: "+err));
+  });   
 });
