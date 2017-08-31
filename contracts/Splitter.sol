@@ -5,6 +5,8 @@ pragma solidity ^0.4.6;
  */ 
 contract Splitter {
     
+	LogContractFinished(uint indexed blockNumber);
+
     mapping(address => uint) usersBalances;
     
     address private owner;
@@ -72,20 +74,12 @@ contract Splitter {
     {
         uint funds = usersBalances[msg.sender];
 
-        if (funds > 0) {
+        require(funds > 0);
 
-            // decreases the funds to avoid reentrant attacks
-            usersBalances[msg.sender] = 0;
-            
-            if (!msg.sender.send(funds)) {
-                usersBalances[msg.sender] = funds;
-                revert();
-            }
+		usersBalances[msg.sender] = 0;	
+		msg.sender.transfer(funds);
 
-            return true;
-        }
-
-        return false;
+		return true;
     }
 
     // Finishes the contract so that no more funds can be received and split
@@ -96,6 +90,9 @@ contract Splitter {
     returns(bool) 
     {        
         killed = true;
+
+        LogContractFinished(block.number);
+
         return killed;
     }    
 }
